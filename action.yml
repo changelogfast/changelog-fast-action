@@ -1,5 +1,5 @@
 name: "changelogfa.st Release Notes"
-description: "Generate release notes and open a CHANGELOG.md PR on each release. Keyless — just install the changelogfa.st App."
+description: "Generate release notes on each release — enrich the GitHub Release or open a CHANGELOG.md PR. Keyless, just install the App."
 author: "changelogfa.st"
 branding:
   icon: "file-text"
@@ -10,14 +10,21 @@ inputs:
     description: "Release note style (e.g. technical, marketing)."
     required: false
     default: "technical"
+  output:
+    description: "What to produce: release (enrich the GitHub Release), pr (open a CHANGELOG.md PR), or both."
+    required: false
+    default: "release"
   api-url:
     description: "changelogfa.st API base URL. Override only for self-hosting/testing."
     required: false
     default: "https://changelogfa.st"
 
 outputs:
+  release-url:
+    description: "URL of the enriched GitHub Release (when output includes 'release')."
+    value: ${{ steps.generate.outputs.release-url }}
   pr-url:
-    description: "URL of the opened CHANGELOG.md pull request."
+    description: "URL of the opened CHANGELOG.md pull request (when output includes 'pr')."
     value: ${{ steps.generate.outputs.pr-url }}
 
 runs:
@@ -37,11 +44,11 @@ runs:
           -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
           "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=changelogfa.st" | jq -r '.value')
 
-        # 2. Ask changelogfa.st to generate the note and open the PR.
+        # 2. Ask changelogfa.st to generate the release note(s).
         RESP=$(curl -sS -w $'\n%{http_code}' -X POST "${{ inputs.api-url }}/api/action/release-notes" \
           -H "Authorization: Bearer $OIDC" \
           -H "Content-Type: application/json" \
-          -d "{\"style\":\"${{ inputs.style }}\"}")
+          -d "{\"style\":\"${{ inputs.style }}\",\"output\":\"${{ inputs.output }}\"}")
         CODE=$(printf '%s' "$RESP" | tail -n1)
         JSON=$(printf '%s' "$RESP" | sed '$d')
         printf '%s\n' "$JSON" | jq . || printf '%s\n' "$JSON"
@@ -51,6 +58,9 @@ runs:
           exit 1
         fi
 
-        PR=$(printf '%s' "$JSON" | jq -r '.pr_url')
-        echo "✅ Opened changelog PR: $PR"
+        RELEASE=$(printf '%s' "$JSON" | jq -r '.release_url // empty')
+        PR=$(printf '%s' "$JSON" | jq -r '.pr_url // empty')
+        [ -n "$RELEASE" ] && echo "✅ Enriched GitHub Release: $RELEASE"
+        [ -n "$PR" ] && echo "✅ Opened changelog PR: $PR"
+        echo "release-url=$RELEASE" >> "$GITHUB_OUTPUT"
         echo "pr-url=$PR" >> "$GITHUB_OUTPUT"
