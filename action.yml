@@ -1,5 +1,5 @@
 name: "changelogfa.st Release Notes"
-description: "Generate a release note and open a CHANGELOG.md pull request on each release. Keyless — just install the changelogfa.st GitHub App."
+description: "Generate release notes and open a CHANGELOG.md PR on each release. Keyless — just install the changelogfa.st App."
 author: "changelogfa.st"
 branding:
   icon: "file-text"
