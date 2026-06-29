@@ -1,0 +1,56 @@
+name: "changelogfa.st Release Notes"
+description: "Generate a release note and open a CHANGELOG.md pull request on each release. Keyless — just install the changelogfa.st GitHub App."
+author: "changelogfa.st"
+branding:
+  icon: "file-text"
+  color: "purple"
+
+inputs:
+  style:
+    description: "Release note style (e.g. technical, marketing)."
+    required: false
+    default: "technical"
+  api-url:
+    description: "changelogfa.st API base URL. Override only for self-hosting/testing."
+    required: false
+    default: "https://changelogfa.st"
+
+outputs:
+  pr-url:
+    description: "URL of the opened CHANGELOG.md pull request."
+    value: ${{ steps.generate.outputs.pr-url }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: generate
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # 1. Mint a keyless OIDC token proving this run belongs to this repo.
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+          echo "::error::Missing OIDC token. Add 'permissions: { id-token: write }' to the job."
+          exit 1
+        fi
+        OIDC=$(curl -sS \
+          -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=changelogfa.st" | jq -r '.value')
+
+        # 2. Ask changelogfa.st to generate the note and open the PR.
+        RESP=$(curl -sS -w $'\n%{http_code}' -X POST "${{ inputs.api-url }}/api/action/release-notes" \
+          -H "Authorization: Bearer $OIDC" \
+          -H "Content-Type: application/json" \
+          -d "{\"style\":\"${{ inputs.style }}\"}")
+        CODE=$(printf '%s' "$RESP" | tail -n1)
+        JSON=$(printf '%s' "$RESP" | sed '$d')
+        printf '%s\n' "$JSON" | jq . || printf '%s\n' "$JSON"
+
+        if [ "$CODE" != "200" ]; then
+          echo "::error::changelogfa.st returned HTTP $CODE"
+          exit 1
+        fi
+
+        PR=$(printf '%s' "$JSON" | jq -r '.pr_url')
+        echo "✅ Opened changelog PR: $PR"
+        echo "pr-url=$PR" >> "$GITHUB_OUTPUT"
