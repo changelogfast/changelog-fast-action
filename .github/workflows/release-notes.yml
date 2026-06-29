@@ -1,0 +1,20 @@
+name: Release Notes
+
+# Dogfood: this Action runs on its own releases. The notes it generates are the
+# "see it live" examples linked from the README.
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: changelogfa.st Release Notes
+        uses: changelogfast/changelog-fast-action@v1
+        with:
+          output: release
+          style: technical

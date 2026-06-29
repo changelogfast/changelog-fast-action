@@ -17,7 +17,7 @@ inputs:
   api-url:
     description: "changelogfa.st API base URL. Override only for self-hosting/testing."
     required: false
-    default: "https://changelogfa.st"
+    default: "https://www.changelogfa.st"
 
 outputs:
   release-url:
@@ -45,7 +45,8 @@ runs:
           "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=changelogfa.st" | jq -r '.value')
 
         # 2. Ask changelogfa.st to generate the release note(s).
-        RESP=$(curl -sS -w $'\n%{http_code}' -X POST "${{ inputs.api-url }}/api/action/release-notes" \
+        #    -L follows a 30x apex->www redirect while preserving the POST body.
+        RESP=$(curl -sS -L -w $'\n%{http_code}' -X POST "${{ inputs.api-url }}/api/action/release-notes" \
           -H "Authorization: Bearer $OIDC" \
           -H "Content-Type: application/json" \
           -d "{\"style\":\"${{ inputs.style }}\",\"output\":\"${{ inputs.output }}\"}")
